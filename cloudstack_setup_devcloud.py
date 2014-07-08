@@ -127,6 +127,7 @@ physNetCmd = createPhysicalNetwork.createPhysicalNetworkCmd()
 physNetCmd.name      = "DevCloud Guest"
 physNetCmd.zoneid    = zone.id
 physNetCmd.isolationmethods = [ "VLAN" ]
+physNetCmd.vlan      = "100-300"
 try:
    resp = conn.marvinRequest(physNetCmd)
    physNetGuest = resp.physicalnetwork
@@ -238,12 +239,23 @@ try:
 except urllib2.HTTPError, e:
    print "configureVirtualRouterElementCmd Failed : " + str(e.msg)
 
+listILB = listInternalLoadBalancerElements.listInternalLoadBalancerElementsCmd()
+confILB = configureInternalLoadBalancerElement.configureInternalLoadBalancerElementCmd()
+confILB.enabled = True
+try:
+    resp = conn.marvinRequest(listILB)
+    for ilbnsp in resp:
+        confILB.id = ilbnsp.id
+        conn.marvinRequest(confILB)
+except urllib2.HTTPError, e:
+   print "configureInternalLoadBalancerElement Failed : " + str(e.msg)
+
 listNsp = listNetworkServiceProviders.listNetworkServiceProvidersCmd()
 updateNsp = updateNetworkServiceProvider.updateNetworkServiceProviderCmd()
 try:
     resp = conn.marvinRequest(listNsp)
     for nsp in resp:
-       if nsp.name in [ "VirtualRouter", "VpcVirtualRouter" ] :
+       if nsp.name in [ "VirtualRouter", "VpcVirtualRouter", "InternalLbVm" ] :
            updateNsp.id    = nsp.id
            updateNsp.state = "Enabled"
            resp = conn.marvinRequest(updateNsp)

@@ -14,14 +14,12 @@ VBoxManage startvm ${DEVCLOUD_VBOX}
 if [ $? -ne 0 ]
 then
   echo Failed to start ${DEVCLOUD_VBOX}
-  exit
 fi
 
 VBoxManage startvm ${HYPERVISOR_VBOX}
 if [ $? -ne 0 ]
 then
   echo Failed to start ${HYPERVISOR_VBOX}
-  exit
 fi
 
 echo Fix database host
@@ -79,6 +77,14 @@ if grep -q 'Management server node 127.0.0.1 is up' jetty-console.out ; then
    echo Provisioning CloudStack with devcloud zone
    python "${SCRIPT_LOCATION}"/cloudstack_setup_devcloud.py
    python "${SCRIPT_LOCATION}"/cloudstack_checkssvmalive.py
+   sleep 30
+   python "${SCRIPT_LOCATION}"/cloudstack_test_basic_instance.py
+fi
+
+
+if [ "$1" == "preponly" ] ; then
+   echo "CloudStack running with PID $SERVER_PID"
+   exit
 fi
 
 mvn -P systemvm -pl :cloud-client-ui jetty:stop
