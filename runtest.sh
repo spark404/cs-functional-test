@@ -10,6 +10,38 @@ export HYPERVISOR_VBOX=DevCloudXen6.2
 rm -f vmops.log
 rm -f jetty-console.out
 
+args=`getopt npb $*`
+if [ $? != 0 ] 
+then
+  echo $0 [-p] [-b]
+  echo  specify -p to stop after preparing the test environment
+  echo  specify -b to build cloudstack before starting the test cycle
+  echo  specify -n to activate the noredist profile
+  exit
+fi
+
+set -- $args
+for i do
+  case $i in
+  -p)
+    PREPARE=1
+    ;;
+  -b)
+    BUILD=1
+    ;;
+  -n)
+    NOREDIST=" -Dnoredist "
+    ;;
+  esac
+done
+
+if [ ! -z "${BUILD}" ]
+ then
+  echo Building CloudStack
+  mvn -Psystemvm ${NOREDIST} clean install
+fi
+
+
 VBoxManage startvm ${DEVCLOUD_VBOX}
 if [ $? -ne 0 ]
 then
@@ -38,7 +70,7 @@ do
 done
 
 echo Update the database
-mvn -P developer -Ddeploydb -pl developer 
+mvn -P developer ${NOREDIST} -Ddeploydb -pl developer 
 
 echo Waiting for xen server to become available
 COUNT=0
@@ -57,7 +89,7 @@ sleep 15
 python "${SCRIPT_LOCATION}"/xapi_cleanup_xenservers.py http://${HYPERVISOR} root password
 
 echo Start CloudStack
-mvn -P systemvm -pl :cloud-client-ui jetty:run > jetty-console.out 2>&1 &
+mvn -P systemvm ${NOREDIST} -pl :cloud-client-ui jetty:run > jetty-console.out 2>&1 &
 SERVER_PID=$!
 
 # Check for initialization of the management server
@@ -77,15 +109,16 @@ if grep -q 'Management server node 127.0.0.1 is up' jetty-console.out ; then
    echo Provisioning CloudStack with devcloud zone
    python "${SCRIPT_LOCATION}"/cloudstack_setup_devcloud.py
    python "${SCRIPT_LOCATION}"/cloudstack_checkssvmalive.py
+
+   if [ ! -z "${PREPARE}" ] ; then
+      echo "CloudStack running with PID $SERVER_PID"
+      exit
+   fi
+
    sleep 30
    python "${SCRIPT_LOCATION}"/cloudstack_test_basic_instance.py
 fi
 
-
-if [ "$1" == "preponly" ] ; then
-   echo "CloudStack running with PID $SERVER_PID"
-   exit
-fi
 
 mvn -P systemvm -pl :cloud-client-ui jetty:stop
 sleep 30
