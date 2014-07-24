@@ -16,10 +16,18 @@ import urllib
 import urllib2
 import logging
 
-from marvin.cloudstackConnection import cloudConnection
-from marvin.cloudstackException import cloudstackAPIException
+from marvin.asyncJobMgr import asyncJobMgr
+from marvin.codes import (FAILED, PASS, ADMIN, DOMAIN_ADMIN,
+                          USER, SUCCESS, XEN_SERVER)
+from marvin.dbConnection import DbConnection
 from marvin.cloudstackAPI import *
-from marvin import cloudstackAPI
+from marvin.cloudstackAPI.cloudstackAPIClient import CloudStackAPIClient
+from marvin.cloudstackException import CloudstackAPIException
+from marvin.cloudstackException import GetDetailExceptionInfo
+from marvin.cloudstackConnection import CSConnection
+from marvin.configGenerator import ConfigManager
+from marvin.lib.utils import (random_gen, validateList)
+
 
 from CSUtils import *
 
@@ -32,6 +40,7 @@ config = {
 
 utils = CSUtils()  
 conn = utils.getConnection()
+apiclient = CloudStackAPIClient(conn)
 
 configuration = {
    'cpu.overprovisioning.factor'     : 10,
@@ -45,19 +54,19 @@ configuration = {
 
 listconfig = listConfigurations.listConfigurationsCmd()
 try:
-   resp = conn.marvinRequest(listconfig)
+   resp = apiclient.listConfigurations(listconfig)
    for item in resp:
-      if item.name == "host":
-         if item.value == "10.200.23.18":
+      if item.name == "cpu.overprovisioning.factor":
+         if item.value == configuration["cpu.overprovisioning.factor"]:
             print "OK, host is correct"
          else:
-            print "Incorrect host setting, updating configuration"
+            print "Incorrect configuration"
             updateConf = updateConfiguration.updateConfigurationCmd()
             for key,value in configuration.iteritems():
                updateConf.name = key
                updateConf.value = value
                try:
-                  resp = conn.marvinRequest(updateConf)
+                  resp = apiclient.updateConfiguration(updateConf)
                   print "Set " + key + " to " + str(value)
                except urllib2.HTTPError, e:
                   print "updateConfigurationCmd failed to set " + key + " : " + str(e.msg)  
@@ -67,18 +76,17 @@ except urllib2.HTTPError, e:
    exit()
             
 zoneCmd = createZone.createZoneCmd()
-zoneCmd.name         = "MCCDZone"
+zoneCmd.name         = "MCCDZone5"
 zoneCmd.networktype  = "Advanced"
 zoneCmd.dns1         = "8.8.8.8"
 zoneCmd.dns2         = "8.8.8.4"
-zoneCmd.internaldns1 = "192.168.56.1"
+zoneCmd.internaldns1 = "192.168.56.2"
 zoneCmd.domain       = "devcloud.local"
 zoneCmd.localstorageenabled = "true"
 zoneCmd.guestcidraddress = "10.1.1.1/24"
 
 try:
-   resp = conn.marvinRequest(zoneCmd)
-   zone = resp.zone
+   zone = apiclient.createZone(zoneCmd)
    print "Zone " + zone.name + " created"
 except urllib2.HTTPError, e:
    print "createZoneCmd Failed : " + str(e.msg)
@@ -89,8 +97,7 @@ physNetCmd.name      = "DevCloud Mgmt"
 physNetCmd.zoneid    = zone.id
 physNetCmd.isolationmethods = [ "VLAN" ]
 try:
-   resp = conn.marvinRequest(physNetCmd)
-   physNetManagement = resp.physicalnetwork
+   physNetManagement = apiclient.createPhysicalNetwork(physNetCmd)
 except urllib2.HTTPError, e:
    print "createPhysicalNetworkCmd Failed : " + str(e.msg)
 
@@ -100,7 +107,7 @@ addTrafficTypeCmd.physicalnetworkid = physNetManagement.id
 addTrafficTypeCmd.traffictype = "Management"
 addTrafficTypeCmd.xennetworklabel = "xenbr0"
 try:
-    resp = conn.marvinRequest(addTrafficTypeCmd)
+    resp = apiclient.addTrafficType(addTrafficTypeCmd)
 except urllib2.HTTPError, e:
    print "createPhysicalNetworkCmd Failed : " + str(e.msg)
 
@@ -108,7 +115,7 @@ except urllib2.HTTPError, e:
 addTrafficTypeCmd.traffictype = "Public"
 addTrafficTypeCmd.xennetworklabel = "xenbr1"
 try:
-    resp = conn.marvinRequest(addTrafficTypeCmd)
+    resp = apiclient.addTrafficType(addTrafficTypeCmd)
 except urllib2.HTTPError, e:
    print "createPhysicalNetworkCmd Failed : " + str(e.msg)
 
@@ -116,7 +123,7 @@ updatePhysNet = updatePhysicalNetwork.updatePhysicalNetworkCmd();
 updatePhysNet.id = physNetManagement.id
 updatePhysNet.state = "Enabled"
 try:
-    resp = conn.marvinRequest(updatePhysNet)
+    resp = apiclient.updatePhysicalNetwork(updatePhysNet)
 except urllib2.HTTPError, e:
    print "updatePhysicalNetworkCmd Failed : " + str(e.msg)
 
@@ -129,8 +136,7 @@ physNetCmd.zoneid    = zone.id
 physNetCmd.isolationmethods = [ "VLAN" ]
 physNetCmd.vlan      = "100-300"
 try:
-   resp = conn.marvinRequest(physNetCmd)
-   physNetGuest = resp.physicalnetwork
+   physNetGuest = apiclient.createPhysicalNetwork(physNetCmd)
 except urllib2.HTTPError, e:
    print "createPhysicalNetworkCmd Failed : " + str(e.msg)
 
@@ -139,7 +145,7 @@ addTrafficTypeCmd.physicalnetworkid = physNetGuest.id
 addTrafficTypeCmd.traffictype = "Guest"
 addTrafficTypeCmd.xennetworklabel = "xenbr0"
 try:
-    resp = conn.marvinRequest(addTrafficTypeCmd)
+    resp = apiclient.addTrafficType(addTrafficTypeCmd)
 except urllib2.HTTPError, e:
    print "createPhysicalNetworkCmd Failed : " + str(e.msg)
 
@@ -147,7 +153,7 @@ updatePhysNet = updatePhysicalNetwork.updatePhysicalNetworkCmd();
 updatePhysNet.id = physNetGuest.id
 updatePhysNet.state = "Enabled"
 try:
-    resp = conn.marvinRequest(updatePhysNet)
+    resp = apiclient.updatePhysicalNetwork(updatePhysNet)
 except urllib2.HTTPError, e:
    print "updatePhysicalNetworkCmd Failed : " + str(e.msg)
 
@@ -162,7 +168,7 @@ createVlan.startip = "10.0.2.100"
 createVlan.endip   = "10.0.2.150"
 createVlan.forvirtualnetwork = True
 try:
-    resp = conn.marvinRequest(createVlan)
+    resp = apiclient.createVlanIpRange(createVlan)
     vlan = resp.vlan
 except urllib2.HTTPError, e:
    print "createVlanIpRangeCmd Failed : " + str(e.msg)
@@ -174,11 +180,10 @@ createPod.name    = "Pod"
 createPod.zoneid  = zone.id
 createPod.startip = "192.168.56.100"
 createPod.endip   = "192.168.56.119"
-createPod.gateway = "192.168.56.1"
+createPod.gateway = "192.168.56.2"
 createPod.netmask = "255.255.255.0"
 try:
-    resp = conn.marvinRequest(createPod)
-    pod = resp.pod
+    pod = apiclient.createPod(createPod)
 except urllib2.HTTPError, e:
    print "createPodCmd Failed : " + str(e.msg)
 print "Pod " + pod.name + " created"
@@ -186,10 +191,9 @@ print "Pod " + pod.name + " created"
 # Add secondary storage
 addSecondary = addSecondaryStorage.addSecondaryStorageCmd()
 addSecondary.zoneid = zone.id
-addSecondary.url    = "nfs://192.168.56.10/opt/storage/secondary"
+addSecondary.url    = "nfs://192.168.56.94/opt/storage/secondary"
 try:
-    resp = conn.marvinRequest(addSecondary)
-    secstor = resp.secondarystorage
+    secstor = apiclient.addSecondaryStorage(addSecondary)
 except urllib2.HTTPError, e:
    print "addCluster Failed : " + str(e.msg)
 print "Secondary storage added : " + secstor.name
@@ -203,7 +207,8 @@ if (config.get('hypervisor_type') == "XenServer") :
 	addCluster.podid       = pod.id
 	addCluster.zoneid      = zone.id
 	try:
-		resp = conn.marvinRequest(addCluster)
+		resp = apiclient.addCluster(addCluster)
+                print repr(resp)
 		xencluster = resp[0]
 	except urllib2.HTTPError, e:
 	   print "addCluster Failed : " + str(e.msg)
@@ -216,11 +221,11 @@ if (config.get('hypervisor_type') == "XenServer") :
 	addXen.zoneid     = zone.id
 	addXen.podid      = pod.id
 	addXen.clusterid  = xencluster.id
-	addXen.url        = "http://192.168.56.11"
+	addXen.url        = "http://192.168.56.234"
 	addXen.username   = "root"
 	addXen.password   = "password"
 	try:
-		resp = conn.marvinRequest(addXen)
+		resp = apiclient.addHost(addXen)
 		xenhosts = resp
 	except urllib2.HTTPError, e:
 	   print "addCluster Failed : " + str(e.msg)
@@ -232,10 +237,10 @@ listVR = listVirtualRouterElements.listVirtualRouterElementsCmd()
 confVR = configureVirtualRouterElement.configureVirtualRouterElementCmd()
 confVR.enabled = True
 try:
-    resp = conn.marvinRequest(listVR)
+    resp = apiclient.listVirtualRouterElements(listVR)
     for vrnsp in resp:
         confVR.id = vrnsp.id
-        conn.marvinRequest(confVR)
+        apiclient.configureVirtualRouterElement(confVR)
 except urllib2.HTTPError, e:
    print "configureVirtualRouterElementCmd Failed : " + str(e.msg)
 
@@ -243,22 +248,22 @@ listILB = listInternalLoadBalancerElements.listInternalLoadBalancerElementsCmd()
 confILB = configureInternalLoadBalancerElement.configureInternalLoadBalancerElementCmd()
 confILB.enabled = True
 try:
-    resp = conn.marvinRequest(listILB)
+    resp = apiclient.listInternalLoadBalancerElements(listILB)
     for ilbnsp in resp:
         confILB.id = ilbnsp.id
-        conn.marvinRequest(confILB)
+        apiclient.configureInternalLoadBalancerElement(confILB)
 except urllib2.HTTPError, e:
    print "configureInternalLoadBalancerElement Failed : " + str(e.msg)
 
 listNsp = listNetworkServiceProviders.listNetworkServiceProvidersCmd()
 updateNsp = updateNetworkServiceProvider.updateNetworkServiceProviderCmd()
 try:
-    resp = conn.marvinRequest(listNsp)
+    resp = apiclient.listNetworkServiceProviders(listNsp)
     for nsp in resp:
        if nsp.name in [ "VirtualRouter", "VpcVirtualRouter", "InternalLbVm" ] :
            updateNsp.id    = nsp.id
            updateNsp.state = "Enabled"
-           resp = conn.marvinRequest(updateNsp)
+           resp = apiclient.updateNetworkServiceProvider(updateNsp)
            nsp = resp.networkserviceprovider
            print "Network Service Provider " + nsp.name + " is " + nsp.state
 except urllib2.HTTPError, e:
@@ -269,7 +274,7 @@ updZone = updateZone.updateZoneCmd()
 updZone.id = zone.id
 updZone.allocationstate = "Enabled"
 try:
-     resp = conn.marvinRequest(updZone)
+     resp = apiclient.updateZone(updZone)
      nvpdev = resp.niciranvpdevice
 except urllib2.HTTPError, e:
       print "updateZoneCmd Failed : " + str(e.msg)

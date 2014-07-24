@@ -17,8 +17,8 @@ import urllib
 import urllib2
 import logging
 
-from marvin.cloudstackConnection import cloudConnection
-from marvin.cloudstackException import cloudstackAPIException
+from marvin.cloudstackConnection import CSConnection
+from marvin.cloudstackException import CloudstackAPIException
 from marvin.cloudstackAPI import *
 from marvin import cloudstackAPI
 
@@ -75,7 +75,7 @@ class CSUtils(object):
       blub.apiKey=apikey
       blub.securityKey=secretkey
 
-      conn = cloudConnection(blub, logger=logging)
+      conn = CSConnection(blub, logger=logging)
       return conn
 
 
