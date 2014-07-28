@@ -191,7 +191,7 @@ print "Pod " + pod.name + " created"
 # Add secondary storage
 addSecondary = addSecondaryStorage.addSecondaryStorageCmd()
 addSecondary.zoneid = zone.id
-addSecondary.url    = "nfs://192.168.56.94/opt/storage/secondary"
+addSecondary.url    = "nfs://192.168.56.10/opt/storage/secondary"
 try:
     secstor = apiclient.addSecondaryStorage(addSecondary)
 except urllib2.HTTPError, e:

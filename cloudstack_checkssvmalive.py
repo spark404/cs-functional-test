@@ -1,5 +1,17 @@
 #!/usr/bin/python
 
+from marvin.asyncJobMgr import asyncJobMgr
+from marvin.codes import (FAILED, PASS, ADMIN, DOMAIN_ADMIN,
+                          USER, SUCCESS, XEN_SERVER)
+from marvin.dbConnection import DbConnection
+from marvin.cloudstackAPI import *
+from marvin.cloudstackAPI.cloudstackAPIClient import CloudStackAPIClient
+from marvin.cloudstackException import CloudstackAPIException
+from marvin.cloudstackException import GetDetailExceptionInfo
+from marvin.cloudstackConnection import CSConnection
+from marvin.configGenerator import ConfigManager
+from marvin.lib.utils import (random_gen, validateList)
+
 from CSUtils import *
 import json
 import time
@@ -7,6 +19,7 @@ import sys
 
 utils = CSUtils()  
 conn = utils.getConnection()
+apiclient = CloudStackAPIClient(conn)
 
 listsvm = listSystemVms.listSystemVmsCmd()
 
@@ -20,7 +33,7 @@ while count > 0 :
   # Check if we have an ssvm
   print "Looking for systemvm of type secondarystoragevm"
   try:
-   resp = conn.marvinRequest(listsvm)
+   resp = apiclient.listSystemVms(listsvm)
    if resp == None or len(resp) == 0 :
      continue
    for svm in resp:
@@ -40,7 +53,7 @@ while count > 0 :
     listhosts.name = ssvm.name
     
     try:
-       resp = conn.marvinRequest(listhosts)
+       resp = apiclient.listHosts(listhosts)
        if len(resp) == 1 :
           ssvmstate = resp[0]
        else :
