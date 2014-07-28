@@ -208,7 +208,6 @@ if (config.get('hypervisor_type') == "XenServer") :
 	addCluster.zoneid      = zone.id
 	try:
 		resp = apiclient.addCluster(addCluster)
-                print repr(resp)
 		xencluster = resp[0]
 	except urllib2.HTTPError, e:
 	   print "addCluster Failed : " + str(e.msg)
@@ -221,12 +220,11 @@ if (config.get('hypervisor_type') == "XenServer") :
 	addXen.zoneid     = zone.id
 	addXen.podid      = pod.id
 	addXen.clusterid  = xencluster.id
-	addXen.url        = "http://192.168.56.234"
+	addXen.url        = "http://192.168.56.11"
 	addXen.username   = "root"
 	addXen.password   = "password"
 	try:
-		resp = apiclient.addHost(addXen)
-		xenhosts = resp
+		xenhosts = apiclient.addHost(addXen)
 	except urllib2.HTTPError, e:
 	   print "addCluster Failed : " + str(e.msg)
 	for xenbox in xenhosts:
@@ -263,8 +261,7 @@ try:
        if nsp.name in [ "VirtualRouter", "VpcVirtualRouter", "InternalLbVm" ] :
            updateNsp.id    = nsp.id
            updateNsp.state = "Enabled"
-           resp = apiclient.updateNetworkServiceProvider(updateNsp)
-           nsp = resp.networkserviceprovider
+           nsp = apiclient.updateNetworkServiceProvider(updateNsp)
            print "Network Service Provider " + nsp.name + " is " + nsp.state
 except urllib2.HTTPError, e:
    print "updateNetworkServiceProviderCmd Failed : " + str(e.msg)
@@ -274,8 +271,7 @@ updZone = updateZone.updateZoneCmd()
 updZone.id = zone.id
 updZone.allocationstate = "Enabled"
 try:
-     resp = apiclient.updateZone(updZone)
-     nvpdev = resp.niciranvpdevice
+     zone = apiclient.updateZone(updZone)
 except urllib2.HTTPError, e:
       print "updateZoneCmd Failed : " + str(e.msg)
 print "Zone " + zone.name + " is Enabled"

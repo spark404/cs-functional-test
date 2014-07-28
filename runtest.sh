@@ -1,7 +1,7 @@
 #!/bin/bash
 
 export MAVEN_OPTS="-Xmx2048m -XX:MaxPermSize=512m"
-export SCRIPT_LOCATION='/Users/hugo/Dropbox/CloudStack/Python scripts/'
+export SCRIPT_LOCATION='/Users/hugo/Documents/workspace/cs-functional-test'
 export DEVCLOUD=192.168.56.10
 export DEVCLOUD_VBOX=DevCloud2
 export HYPERVISOR=192.168.56.11
