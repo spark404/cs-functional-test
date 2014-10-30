@@ -54,7 +54,7 @@ while count > 0 :
     
     try:
        resp = apiclient.listHosts(listhosts)
-       if len(resp) == 1 :
+       if not resp == None and len(resp) == 1 :
           ssvmstate = resp[0]
        else :
           continue

@@ -38,7 +38,7 @@ done
 if [ ! -z "${BUILD}" ]
  then
   echo Building CloudStack
-  mvn -Psystemvm ${NOREDIST} clean install
+  mvn -T 2C -Psystemvm ${NOREDIST} clean install
 fi
 
 
@@ -72,6 +72,10 @@ done
 echo Update the database
 mvn -P developer ${NOREDIST} -Ddeploydb -pl developer 
 
+echo Start CloudStack
+mvn -P systemvm ${NOREDIST} -pl :cloud-client-ui jetty:run > jetty-console.out 2>&1 &
+SERVER_PID=$!
+
 echo Waiting for xen server to become available
 COUNT=0
 ssh -o BatchMode=true root@${HYPERVISOR} exit
@@ -87,10 +91,6 @@ done
 echo Clean the xenserver
 sleep 15
 python "${SCRIPT_LOCATION}"/xapi_cleanup_xenservers.py http://${HYPERVISOR} root password
-
-echo Start CloudStack
-mvn -P systemvm ${NOREDIST} -pl :cloud-client-ui jetty:run > jetty-console.out 2>&1 &
-SERVER_PID=$!
 
 # Check for initialization of the management server
 COUNTER=0
