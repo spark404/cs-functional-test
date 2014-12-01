@@ -2,10 +2,10 @@
 
 export MAVEN_OPTS="-Xmx2048m -XX:MaxPermSize=512m"
 export SCRIPT_LOCATION='/Users/hugo/Documents/workspace/cs-functional-test'
-export DEVCLOUD=192.168.56.10
-export DEVCLOUD_VBOX=DevCloud2
+export DEVCLOUD=192.168.56.9
+export DEVCLOUD_VBOX=7abb7a53-7b1c-4b2e-98e9-2cc4a3775039
 export HYPERVISOR=192.168.56.11
-export HYPERVISOR_VBOX=DevCloudXen6.2
+export HYPERVISOR_VBOX=62f44fdb-b612-4c71-963b-149641dc881f
 
 rm -f vmops.log
 rm -f jetty-console.out
@@ -42,7 +42,7 @@ if [ ! -z "${BUILD}" ]
 fi
 
 
-VBoxManage startvm ${DEVCLOUD_VBOX}
+VBoxManage startvm "${DEVCLOUD_VBOX}"
 if [ $? -ne 0 ]
 then
   echo Failed to start ${DEVCLOUD_VBOX}
@@ -71,6 +71,9 @@ done
 
 echo Update the database
 mvn -P developer ${NOREDIST} -Ddeploydb -pl developer 
+
+echo apply custom fix
+ssh -o BatchMode=true root@${DEVCLOUD} 'mysql cloud < fix.sql'
 
 echo Start CloudStack
 mvn -P systemvm ${NOREDIST} -pl :cloud-client-ui jetty:run > jetty-console.out 2>&1 &
